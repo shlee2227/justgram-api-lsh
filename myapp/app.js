@@ -7,7 +7,7 @@ const morgan = require("morgan");
 const app = express();
 const dotenv = require("dotenv");
 
-console.log(process);
+dotenv.config();
 
 const myDataSource = new DataSource({
   type: process.env.TYPEORM_CONNECTION,
@@ -18,7 +18,6 @@ const myDataSource = new DataSource({
   database: process.env.TYPEORM_DATABASE,
 });
 
-dotenv.config();
 app.use(cors());
 
 app.get("/ping", function (req, res, next) {
@@ -30,9 +29,6 @@ app.listen(3000, function () {
 });
 
 app.use(morgan("combined"));
-console.log("DB_HOST:", process.env.DB_HOST);
-console.log("DB_USER:", process.env.DB_USER);
-console.log("DB_PASS:", process.env.DB_PASS);
 
 myDataSource.initialize().then(() => {
   console.log("Data Source has been initialized!");
