@@ -1,6 +1,6 @@
 const http = require("http");
 require("dotenv").config();
-const { DataSource } = require("typeorm");
+const { DataSource, Column } = require("typeorm");
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
@@ -75,8 +75,6 @@ app.post("/createpost", (req, res) => {
     });
 });
 
-//////////////////////////////////////////////
-
 app.get("/postlist", async (req, res) => {
   //포스트 전체 리스트를 유저 정보와 함께 반환
   const queryRes = await myDataSource.query("SELECT * FROM postings");
@@ -89,58 +87,76 @@ app.get("/postlist", async (req, res) => {
   res.json({ data: newPosts });
 });
 
-// app.patch("/editpost", (req, res) => {
-//   //기존 포스트의 아이디와 일부 정보를 받아와서 해당 아이디의 포스트를 수정하고, 수정된 내용을 유저 정보와 함께 반환
-//   const newPost = req.body.data;
-//   const post = posts.find((req) => req.id === newPost.id);
-//   for (let key in newPost) {
-//     post[key] = newPost[key];
-//   }
-//   const user = users.find((req) => req.id === post.userId);
-//   const newData = {
-//     id: post.id,
-//     title: post.title,
-//     content: post.content,
-//     userId: post.userId,
-//     userName: user.name,
-//   };
-//   res.json({ data: newData });
-// });
+//////////////////////////////////////////////
 
-// app.delete("/deletepost", (req, res) => {
-//   //기존 포스트의 아이디를 받아서 해당 포스트를 배열에서 삭제하고 삭제 코멘트 반환
-//   const deleteInfo = req.body.data;
-//   const postId = posts.findIndex((req) => req.id === deleteInfo.id);
-//   posts.splice(postId, 1);
-//   res.json({ message: "posting deleted" });
-// }); //배열 요소를 filter로 찾기도 함
+app.patch("/editpost", async (req, res) => {
+  //기존 포스트의 아이디와 일부 정보를 받아와서 해당 아이디의 포스트를 수정하고, 수정된 내용을 유저 정보와 함께 반환
+  const postId = req.body.data.id;
+  console.log(newPost);
+  // for (let key in newPost) {
+  //   if (key === "id") {
+  //   } else {
+  //     const col = eval(key);
+  //     await myDataSource.query(
+  //       `
+  //     UPDATE postings
+  //     SET ? = ?
+  //     WHERE id = ?`,
+  //       [col, newPost[key], postId]
+  //     );
+  //   }
+  // }             db 수정을 못하고있음
 
-// app.post("/userpostlist", (req, res) => {
-//   const targetUser = req.body.data;
-//   const user = users.find((req) => req.id === targetUser.userId);
-//   let userAndPosts = {
-//     userId: user.id,
-//     userName: user.name,
-//     postings: [],
-//   };
+  const queryRes = await myDataSource.query("SELECT * FROM postings");
+  const post = queryRes.find((req) => req.id === newPost.id);
+  const queryResusers = await myDataSource.query("SELECT * FROM users");
+  const user = queryResusers.find((user) => user.id === post.user_id);
 
-//   console.log(userAndPosts);
+  const newData = {
+    id: post.id,
+    title: post.title,
+    content: post.contents,
+    userd: post.user_id,
+    userName: user.nickname,
+  };
+  res.json({ data: newData });
+});
 
-//   for (let i = 0; i < posts.length; i++) {
-//     if (posts[i].userId === targetUser.userId) {
-//       let pushPost = {
-//         postingId: posts[i].id,
-//         postingTitle: posts[i].title,
-//         postingContent: posts[i].content,
-//       };
+app.delete("/deletepost", async (req, res) => {
+  //기존 포스트의 아이디를 받아서 해당 포스트를 배열에서 삭제하고 삭제 코멘트 반환
+  const deleteInfo = req.body.data.id;
+  await myDataSource.query("DELETE FROM postings WHERE id = ?", [deleteInfo]);
+  res.json({ message: "posting deleted" });
+});
 
-//       userAndPosts.postings.push(pushPost);
-//     }
-//   }
-//   console.log(userAndPosts);
+app.post("/userpostlist", async (req, res) => {
+  const targetUserId = req.body.data.userId;
+  const user = await myDataSource.query("SELECT * FROM users WHERE Id = ?", [
+    targetUserId,
+  ]);
+  const post = await myDataSource.query(
+    "SELECT * FROM postings WHERE user_id = ?",
+    [targetUserId]
+  );
 
-//   res.json({ data: userAndPosts });
-// });
+  console.log(user);
+  let userAndPosts = {
+    userId: user[0].id,
+    userName: user[0].nickname,
+    postings: [],
+  };
+
+  for (let i = 0; i < post.length; i++) {
+    let pushPost = {
+      postingId: post[i].id,
+      postingTitle: post[i].title,
+      postingContent: post[i].contents,
+    };
+    userAndPosts.postings.push(pushPost);
+  }
+
+  res.json({ data: userAndPosts });
+});
 
 const server = http.createServer(app);
 server.listen(8000, () => {
