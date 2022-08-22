@@ -6,6 +6,9 @@ const cors = require("cors");
 const morgan = require("morgan");
 const app = express();
 const dotenv = require("dotenv");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+
 app.use(cors()); //최상단에  작성(const app 바로 아래)
 dotenv.config();
 app.use(morgan("combined"));
@@ -35,9 +38,46 @@ app.get("/ping", function (req, res, next) {
 });
 
 //회원가입, 사용자 생성, 로그인, 포스트 작성, 포스트 목록 보기, 포스트 수정하기
+app.get("/login", (req, res) => {
+  //required key 입력 여부 확인
+  const hasKey = { email: false, password: false };
+  const requireKey = Object.keys(hasKey);
+  Object.entries(req.body.data).forEach((keyValue) => {
+    const [key, value] = keyValue;
+    if (requireKey.includes(key) && value) {
+      hasKey[key] = true;
+    }
+  });
+  const hasKeyArray = Object.entries(hasKey);
+  for (let i = 0; i < hasKeyArray.length; i++) {
+    const [key, value] = hasKeyArray[i];
+    if (!value) {
+      res.status(400).json({ message: `please enter ${key}` });
+      return;
+    }
+  }
+  //email validation (@ . 있는지)
+  //email이 데이터에 있느지 확인
+  //email이 있으면 입력값에 따른 user db 불러오고 사용자가 넣은 비밀번호를 암호화해서 저장된 패스워드와 비교
+  const { email, password } = req.body.data;
+  const dbPw = myDataSource.query(
+    `SELECT password FROM users WHERE email = ?`,
+    [email]
+  );
+  try {
+    bcrypt.compareSync(password, dbPw); //여기서 뭘 어덯게 해야하는거징
+    // 반응 주기 ... try에 패스워드 비교가 필요한건지?
+  } catch (err) {
+    res.status(500).json({
+      massage: "user create failed",
+    });
+    console.log(err);
+  }
+});
 
-app.post("/signup", (req, res) => {
+app.post("/signup", async (req, res) => {
   //유저 정보 받아와서 유저 배열에 추가하고 성공시 성공
+  //required key 입력 여부 확인
   const hasKey = { email: false, nickname: false, password: false };
   const requireKey = Object.keys(hasKey);
   Object.entries(req.body.data).forEach((keyValue) => {
@@ -54,15 +94,26 @@ app.post("/signup", (req, res) => {
       return;
     }
   }
+  const { email, nickname, password } = req.body.data;
 
+  //pw 암호화
+  //이건 공홈에서 받아온 코드... 아직 안써봄
+  // bcrypt.genSalt(10, function (err, salt) {
+  //   bcrypt.hash("password", salt, function (err, hash) {
+  //     //암호화된 비밀번호를 db에 저장하는 코드 입력
+  //   });
+  // });
+  const salt = bcrypt.genSaltSync(12);
+  const hashedPw = bcrypt.hashSync(password, salt);
+
+  //data db에 입력
   try {
-    const { email, nickname, password } = req.body.data;
-    myDataSource.query(
+    await myDataSource.query(
       `
     INSERT INTO users (email, nickname, password)
     VALUES (?, ?, ?)
   `,
-      [email, nickname, password]
+      [email, nickname, hashedPw]
     );
     res.status(201).json({ massage: "user created" });
   } catch (err) {
@@ -153,9 +204,13 @@ app.patch("/editpost", async (req, res) => {
       if (key === "id") {
       } else {
         await myDataSource.query(
+          //   `
+          //   UPDATE postings
+          //   SET ${key}= '${newPost[key]}'
+          //   WHERE id = ${newPost.id}`
           `
         UPDATE postings
-        SET ? = ?
+        SET ?= ?
         WHERE id = ?`,
           [key, newPost[key], newPost.id] //<--오류 나는 부분 contents 가 아니라 'contents'로 들어가는게 문제인것 처럼 보임
         );
@@ -184,6 +239,9 @@ app.patch("/editpost", async (req, res) => {
 
 app.delete("/deletepost", async (req, res) => {
   //기존 포스트의 아이디를 받아서 해당 포스트를 배열에서 삭제하고 삭제 코멘트 반환/커스텀 에러 (해당 정보가 없을 경우 추가)
+  //이 포스트가 다른 데이터(코멘트)에 레퍼런스로 달려있는 경우
+  //1. 해당 포스트를 가지는 코멘트를 전부 지움 (레퍼가 있는 데이터들에 쿼리 보내서 삭제함)
+  //2. db 만들때무터 parents column이 지워지면 그대로 남아있을지/삭제될지/null로 치환될지 선택할 수 있음 --> on delete option
   const targetPostId = req.body.data.id;
   if (!targetPostId) {
     res.status(400).json({ message: "please enter post id" });
@@ -234,6 +292,19 @@ app.post("/userpostlist", async (req, res) => {
     res.status(500).json({ massage: "user post loading fail" });
     console.log(err);
   }
+});
+
+app.get("/hello", async (req, res) => {
+  const postingData = await myDataSource.query(`
+SELECT
+  users.id as user_id,
+  postings.id as posting_id,
+  contents,
+  email 
+FROM justgram.postings
+JOIN justgram.users ON users.id = postings.user_id;
+`);
+  console.log("postingData: ", postingData);
 });
 
 const server = http.createServer(app);
