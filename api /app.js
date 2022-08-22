@@ -8,13 +8,13 @@ const app = express();
 const dotenv = require("dotenv");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { title } = require("process");
 
 app.use(cors()); //최상단에  작성(const app 바로 아래)
 dotenv.config();
 app.use(morgan("combined"));
 app.use(express.json());
 
-//typeorm
 const myDataSource = new DataSource({
   type: process.env.TYPEORM_CONNECTION,
   host: process.env.TYPEORM_HOST,
@@ -38,7 +38,9 @@ app.get("/ping", function (req, res, next) {
 });
 
 //회원가입, 사용자 생성, 로그인, 포스트 작성, 포스트 목록 보기, 포스트 수정하기
-app.get("/login", (req, res) => {
+app.post("/login", async (req, res) => {
+  const { email, password } = req.body.data;
+
   //required key 입력 여부 확인
   const hasKey = { email: false, password: false };
   const requireKey = Object.keys(hasKey);
@@ -57,22 +59,27 @@ app.get("/login", (req, res) => {
     }
   }
   //email validation (@ . 있는지)
+  // const isVaildEmail =
   //email이 데이터에 있느지 확인
-  //email이 있으면 입력값에 따른 user db 불러오고 사용자가 넣은 비밀번호를 암호화해서 저장된 패스워드와 비교
-  const { email, password } = req.body.data;
-  const dbPw = myDataSource.query(
-    `SELECT password FROM users WHERE email = ?`,
+  const [user] = await myDataSource.query(
+    `
+SELECT 
+id, password FROM users WHERE email = ?
+`,
     [email]
   );
-  try {
-    bcrypt.compareSync(password, dbPw); //여기서 뭘 어덯게 해야하는거징
-    // 반응 주기 ... try에 패스워드 비교가 필요한건지?
-  } catch (err) {
-    res.status(500).json({
-      massage: "user create failed",
-    });
-    console.log(err);
+  if (!user) {
+    res.status(400).json({ message: `No user in DB` });
+    return;
   }
+
+  //email이 있으면 입력값에 따른 user db 불러오고 사용자가 넣은 비밀번호를 암호화해서 저장된 패스워드와 비교
+  const isPasswordCorrect = bcrypt.compareSync(password, user.password);
+  if (!isPasswordCorrect) {
+    res.status(400).json({ message: "invalid password" });
+  }
+  const token = jwt.sign({ userId: user.id }, "secretKey");
+  res.status(200).json({ message: "login success", token: token });
 });
 
 app.post("/signup", async (req, res) => {
@@ -162,21 +169,20 @@ app.post("/createpost", (req, res) => {
 app.get("/postlist", async (req, res) => {
   //포스트 전체 리스트를 유저 정보와 함께 반환
   try {
-    const post = await myDataSource.query("SELECT * FROM postings");
-    const users = await myDataSource.query("SELECT * FROM users");
-    let queryRes = post;
-    queryRes = queryRes.map((data) => {
-      const user = users.find((user) => user.id === data.user_id);
-      return { ...data, userName: user.nickname };
-    });
-    res.status(201).json({ data: queryRes });
+    const postingData = await myDataSource.query(`SELECT
+     postings.id as id, 
+     users.id as user_id,
+     users.nickname as user_name,
+     postings.title as title,
+     postings.contents as contents,
+     postings.created_at as created_at
+     FROM justgram.postings JOIN justgram.users ON users.id  = postings.user_id`);
+    res.status(201).json({ data: postingData });
   } catch (err) {
     res.status(500).json({ massage: "post loading fail" });
     console.log(err);
   }
 });
-
-//////////////////////////////////////////////
 
 app.patch("/editpost", async (req, res) => {
   //기존 포스트의 아이디와 일부 정보를 받아와서 해당 아이디의 포스트를 수정하고, 수정된 내용을 유저 정보와 함께 반환
@@ -200,37 +206,28 @@ app.patch("/editpost", async (req, res) => {
 
   try {
     const newPost = req.body.data;
-    for (let key in newPost) {
-      if (key === "id") {
-      } else {
-        await myDataSource.query(
-          //   `
-          //   UPDATE postings
-          //   SET ${key}= '${newPost[key]}'
-          //   WHERE id = ${newPost.id}`
-          `
+    //for (let key in newPost) {} 객체 내에서 있는 키만 받아서 수정하도록 하고싶은데 잘 안됨 -> key 값을 변수로 입력할때 'key'형태로 들어감
+    await myDataSource.query(
+      `
         UPDATE postings
-        SET ?= ?
+        SET contents = ?
         WHERE id = ?`,
-          [key, newPost[key], newPost.id] //<--오류 나는 부분 contents 가 아니라 'contents'로 들어가는게 문제인것 처럼 보임
-        );
-      }
-    } //db 수정을 못하고있음
+      [newPost.contents, newPost.id]
+    );
 
-    const queryRes = await myDataSource.query("SELECT * FROM postings");
-    const post = queryRes.find((req) => req.id === newPost.id);
-    const queryResusers = await myDataSource.query("SELECT * FROM users");
-    const user = queryResusers.find((user) => user.id === post.user_id);
-
-    const newData = {
-      id: post.id,
-      title: post.title,
-      content: post.contents,
-      userd: post.user_id,
-      userName: user.nickname,
-    };
-
-    res.status(201).json({ data: newData });
+    const editedData = await myDataSource.query(
+      `SELECT 
+      postings.id as id, 
+      users.id as user_id,
+      users.nickname as user_name,
+      postings.title as title,
+      postings.contents as contents
+     FROM justgram.postings JOIN justgram.users
+     ON users.id = postings.user_id
+     WHERE postings.id = ?`,
+      [newPost.id]
+    );
+    res.status(201).json({ data: editedData });
   } catch (err) {
     res.status(500).json({ massage: "post editing fail" });
     console.log(err);
@@ -238,10 +235,6 @@ app.patch("/editpost", async (req, res) => {
 });
 
 app.delete("/deletepost", async (req, res) => {
-  //기존 포스트의 아이디를 받아서 해당 포스트를 배열에서 삭제하고 삭제 코멘트 반환/커스텀 에러 (해당 정보가 없을 경우 추가)
-  //이 포스트가 다른 데이터(코멘트)에 레퍼런스로 달려있는 경우
-  //1. 해당 포스트를 가지는 코멘트를 전부 지움 (레퍼가 있는 데이터들에 쿼리 보내서 삭제함)
-  //2. db 만들때무터 parents column이 지워지면 그대로 남아있을지/삭제될지/null로 치환될지 선택할 수 있음 --> on delete option
   const targetPostId = req.body.data.id;
   if (!targetPostId) {
     res.status(400).json({ message: "please enter post id" });
@@ -249,7 +242,10 @@ app.delete("/deletepost", async (req, res) => {
   }
   try {
     const deleteInfo = req.body.data.id;
-    await myDataSource.query("DELETE FROM postings WHERE id = ?", [deleteInfo]);
+    await myDataSource.query(`DELETE FROM comments WHERE posting_id = ?`, [
+      deleteInfo,
+    ]);
+    await myDataSource.query(`DELETE FROM postings WHERE id = ?`, [deleteInfo]);
     res.status(201).json({ message: "posting deleted" });
   } catch (err) {
     res.status(500).json({ massage: "post editing fail" });
@@ -265,46 +261,25 @@ app.post("/userpostlist", async (req, res) => {
     return;
   }
   try {
-    const user = await myDataSource.query("SELECT * FROM users WHERE Id = ?", [
-      targetUserId,
-    ]);
-    const post = await myDataSource.query(
-      "SELECT * FROM postings WHERE user_id = ?",
+    const userPosts = await myDataSource.query(
+      `SELECT 
+      postings.id as id, 
+      users.id as user_id,
+      users.nickname as user_name,
+      postings.title as title,
+      postings.contents as contents,
+      postings.created_at as created_at
+      FROM justgram.users JOIN justgram.postings
+      ON users.id = postings.user_id
+      WHERE users.id = ?`,
       [targetUserId]
     );
 
-    let userAndPosts = {
-      userId: user[0].id,
-      userName: user[0].nickname,
-      postings: [],
-    };
-
-    for (let i = 0; i < post.length; i++) {
-      let pushPost = {
-        postingId: post[i].id,
-        postingTitle: post[i].title,
-        postingContent: post[i].contents,
-      };
-      userAndPosts.postings.push(pushPost);
-    }
-    res.status(201).json({ data: userAndPosts });
+    res.status(201).json({ data: userPosts });
   } catch (err) {
     res.status(500).json({ massage: "user post loading fail" });
     console.log(err);
   }
-});
-
-app.get("/hello", async (req, res) => {
-  const postingData = await myDataSource.query(`
-SELECT
-  users.id as user_id,
-  postings.id as posting_id,
-  contents,
-  email 
-FROM justgram.postings
-JOIN justgram.users ON users.id = postings.user_id;
-`);
-  console.log("postingData: ", postingData);
 });
 
 const server = http.createServer(app);
