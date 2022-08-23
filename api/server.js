@@ -1,17 +1,15 @@
 const http = require("http");
 require("dotenv").config();
-const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
-const app = express();
 const dotenv = require("dotenv");
 
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const { DataSource, Column } = require("typeorm");
-
 const { title } = require("process");
-const router = require("./routers");
+const { createApp } = require("./app");
+
 app.use(cors()); //최상단에  작성(const app 바로 아래)
 dotenv.config();
 app.use(morgan("combined"));

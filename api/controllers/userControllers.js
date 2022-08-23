@@ -54,7 +54,7 @@ const login = async (req, res) => {
   if (!user.isPasswordCorrect) {
     return res.status(400).json({ message: "invalid password" });
   }
-  const token = jwt.sign({ userId: user.id }, "secretKey");
+  const token = jwt.sign({ userId: user.id }, process.env.secretKey);
   return res.status(200).json({ message: "login success", token: token });
 };
 
@@ -85,21 +85,21 @@ const createPost = async (req, res) => {
   return res.status(201).json({ massage: "post created" });
 };
 
-const readPostList = async (req, res) => {
-  const post = await userService.readPostList();
+const getPostList = async (req, res) => {
+  const post = await userService.getPostList();
   if (!post) {
     return res.status(500).json({ massage: "post loading fail" });
   }
   return res.status(201).json({ data: post });
 };
 
-const readUserPost = async (req, res) => {
+const getUserPost = async (req, res) => {
   const userId = req.body.data.userId;
   if (!userId) {
     res.status(400).json({ message: "please enter user id" });
     return;
   }
-  const userPosts = await userService.readUserPost(userId);
+  const userPosts = await userService.getUserPost(userId);
   console.log(userPosts);
   if (!userPosts[0]) {
     return res.status(500).json({ massage: "user post loading fail" }); //임시로 빈 배열 첫번째 요소를 넣어서 에러 반환 -> 어떻게 하는지 추가 필요
@@ -151,8 +151,8 @@ module.exports = {
   createUser,
   login,
   createPost,
-  readPostList,
-  readUserPost,
+  getPostList,
+  getUserPost,
   updatePost,
   deletePost,
 };

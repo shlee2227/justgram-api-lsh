@@ -4,7 +4,8 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "nodemon app.js",
+    "test": "DOTENV_CONFIG_PATH=.env.test jest --setupFiles=dotenv/config"
   },
   "keywords": [],
   "author": "",
@@ -21,6 +22,8 @@
   },
   "devDependencies": {
     "bcryptjs": "^2.4.3",
-    "jsonwebtoken": "^8.5.1"
+    "jest": "^28.1.3",
+    "jsonwebtoken": "^8.5.1",
+    "supertest": "^6.2.4"
   }
 }

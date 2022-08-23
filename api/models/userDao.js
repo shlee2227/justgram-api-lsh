@@ -18,6 +18,8 @@ myDataSource
     console.log("Date source initializing fail");
   });
 
+//dao는 어떤 데이터를 어떻게 처리하는지를 기준으로 이름을 정함
+
 const createUser = async (email, nickname, hashedPw) => {
   console.log("D1");
 
@@ -32,7 +34,7 @@ const createUser = async (email, nickname, hashedPw) => {
   return user;
 };
 
-const login = async (email) => {
+const findUserByEmail = async (email) => {
   const user = await myDataSource.query(
     `
 SELECT 
@@ -55,7 +57,7 @@ const createPost = async (title, user_id, contents) => {
   return isPostCreated;
 };
 
-const readPostList = async () => {
+const getPostList = async () => {
   const post = await myDataSource.query(`SELECT
    postings.id as id, 
    users.id as user_id,
@@ -67,7 +69,7 @@ const readPostList = async () => {
   return post;
 };
 
-const readUserPost = async (userId) => {
+const getPostListByUserId = async (userId) => {
   const userPosts = await myDataSource.query(
     `SELECT 
     postings.id as id, 
@@ -121,11 +123,22 @@ const deletePost = async (id) => {
 
 module.exports = {
   createUser,
-  login,
+  findUserByEmail,
   createPost,
-  readPostList,
-  readUserPost,
+  getPostList,
+  getPostListByUserId,
   updatePost,
   getPost,
   deletePost,
 };
+
+// module.exports = {
+//   createUser,
+//   login,
+//   createPost,
+//   readPostList,
+//   readUserPost,
+//   updatePost,
+//   getPost,
+//   deletePost,
+// };

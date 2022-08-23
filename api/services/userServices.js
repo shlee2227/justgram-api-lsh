@@ -13,7 +13,7 @@ const createUser = async (email, nickname, password) => {
 };
 
 const login = async (email, password) => {
-  let user = (await userDao.login(email))[0];
+  let user = (await userDao.findUserByEmail(email))[0];
   //if (!user.id) {return user.id}
   user.isPasswordCorrect = bcrypt.compareSync(password, user.password);
   return user;
@@ -24,13 +24,13 @@ const createPost = async (title, user_id, contents) => {
   return isPostCreated;
 };
 
-const readPostList = async () => {
-  const post = await userDao.readPostList();
+const getPostList = async () => {
+  const post = await userDao.getPostList();
   return post;
 };
 
-const readUserPost = async (userId) => {
-  const userPosts = await userDao.readUserPost(userId);
+const getUserPost = async (userId) => {
+  const userPosts = await userDao.getPostListByUserId(userId);
   return userPosts;
 };
 
@@ -51,8 +51,8 @@ module.exports = {
   createUser,
   login,
   createPost,
-  readPostList,
-  readUserPost,
+  getPostList,
+  getUserPost,
   updatePost,
   deletePost,
 };
