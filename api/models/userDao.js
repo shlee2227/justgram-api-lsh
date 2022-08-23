@@ -35,6 +35,7 @@ const createUser = async (email, nickname, hashedPw) => {
 };
 
 const findUserByEmail = async (email) => {
+  console.log("3-1");
   const user = await myDataSource.query(
     `
 SELECT 
@@ -42,103 +43,11 @@ id, password FROM users WHERE email = ?
 `,
     [email]
   );
+  console.log("3-2");
   return user;
-};
-
-const createPost = async (title, user_id, contents) => {
-  const isPostCreated = myDataSource.query(
-    `
-  INSERT INTO postings (title, user_id, contents)
-  VALUES (?, ?, ?)
-`,
-    [title, user_id, contents]
-  );
-  console.log(isPostCreated);
-  return isPostCreated;
-};
-
-const getPostList = async () => {
-  const post = await myDataSource.query(`SELECT
-   postings.id as id, 
-   users.id as user_id,
-   users.nickname as user_name,
-   postings.title as title,
-   postings.contents as contents,
-   postings.created_at as created_at
-   FROM justgram.postings JOIN justgram.users ON users.id  = postings.user_id`);
-  return post;
-};
-
-const getPostListByUserId = async (userId) => {
-  const userPosts = await myDataSource.query(
-    `SELECT 
-    postings.id as id, 
-    users.id as user_id,
-    users.nickname as user_name,
-    postings.title as title,
-    postings.contents as contents,
-    postings.created_at as created_at
-    FROM justgram.users JOIN justgram.postings
-    ON users.id = postings.user_id
-    WHERE users.id = ?`,
-    [userId]
-  );
-  return userPosts;
-};
-
-const updatePost = async (id, contents) => {
-  return await myDataSource.query(
-    `
-      UPDATE postings
-      SET contents = ?
-      WHERE id = ?`,
-    [contents, id]
-  );
-};
-
-const getPost = async (id) => {
-  const post = await myDataSource.query(
-    `SELECT 
-    postings.id as id, 
-    users.id as user_id,
-    users.nickname as user_name,
-    postings.title as title,
-    postings.contents as contents
-   FROM justgram.postings JOIN justgram.users
-   ON users.id = postings.user_id
-   WHERE postings.id = ?`,
-    [id]
-  );
-  return post;
-};
-
-const deletePost = async (id) => {
-  const isDeleted =
-    (await myDataSource.query(`DELETE FROM comments WHERE posting_id = ?`, [
-      id,
-    ]),
-    await myDataSource.query(`DELETE FROM postings WHERE id = ?`, [id]));
-  return isDeleted;
 };
 
 module.exports = {
   createUser,
   findUserByEmail,
-  createPost,
-  getPostList,
-  getPostListByUserId,
-  updatePost,
-  getPost,
-  deletePost,
 };
-
-// module.exports = {
-//   createUser,
-//   login,
-//   createPost,
-//   readPostList,
-//   readUserPost,
-//   updatePost,
-//   getPost,
-//   deletePost,
-// };
